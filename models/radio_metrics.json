@@ -1,0 +1,12 @@
+{
+  "model_type": "monotone_pytorch_radio_surrogate",
+  "dataset_kind": "synthetic analytic assumptions; not real RF measurements",
+  "validation_mae": 3.5e-06,
+  "training_samples": 18000,
+  "validation_samples": 4000,
+  "hidden_layers": [
+    64,
+    32
+  ],
+  "seed": 2981
+}
