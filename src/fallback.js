@@ -1,3 +1,4 @@
+import { wirelessSuccessChance } from './simulation.js';
 // Isometric canvas fallback keeps the dashboard usable on devices without WebGL.
 export function createFallbackScene(container, onMove) {
   const canvas=document.createElement('canvas');canvas.style.cssText='width:100%;height:100%;display:block;touch-action:none;cursor:grab';container.append(canvas);
@@ -11,7 +12,7 @@ export function createFallbackScene(container, onMove) {
   function render(sim,running=false){
     const now=performance.now(),dt=Math.min(.05,Math.max(0,(now-lastTime)/1000));lastTime=now;if(running){motion+=dt;if(sim.actuators.fan)fanAngle+=dt*9;}
     current=sim;const {w,h,s}=metrics(), dpr=Math.min(devicePixelRatio||1,2);if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);}
-    c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);c.fillStyle='#e8f0e9';c.fillRect(0,0,w,h);
+    c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);c.fillStyle=sim.env.isDay?'#e8f0e9':'#263c4b';c.fillRect(0,0,w,h);
     poly([[-1.2,0,-1.65],[1.2,0,-1.65],[1.2,0,1.65],[-1.2,0,1.65]],'#c2cfbd');
     poly([[-1,0,-1.5],[-1,1.6,-1.5],[1,1.6,-1.5],[1,0,-1.5]],'rgba(199,231,218,.30)');
     poly([[-1,1.6,-1.5],[0,2,-1.5],[0,2,1.5],[-1,1.6,1.5]],'rgba(222,244,235,.40)');
@@ -31,14 +32,17 @@ export function createFallbackScene(container, onMove) {
       segment([[x,1.47,-1.25],[x,1.47,1.25]],'#4b6c63',3);
       for(const z of [-.72,.72]){
         ellipse(x,1.42,z,.04,.025,'#8ba79d');
-        if(sim.actuators.pump&&sim.env.water>0)for(let j=0;j<8;j++){const t=(motion*1.5+j/8)%1,spread=(j%2?1:-1)*.16*t;ellipse(x+spread,1.38-.93*t,z+Math.sin(j*2.4)*.14*t,.017,.024,'#23a8e0');}
+        if(sim.actuators.mist&&sim.env.water>0)for(let j=0;j<12;j++){const t=(motion*.7+j/12)%1,spread=(j%2?1:-1)*.16*t;ellipse(x+spread,1.38-.93*t,z+Math.sin(j*2.4)*.14*t,.025,.025,'rgba(191,235,249,.72)');}
       }
       segment([[x,.3,-1.25],[x,.3,1.25]],sim.actuators.pump?'#398bc1':'#293e35',3);
     }
     ellipse(-.75,.3,-1.3,.12,.10,sim.actuators.cool?'#65b5c1':'#8cb7b6');
+    if(sim.actuators.lamp){const [lx,ly]=project(0,1.7,0);const glow=c.createRadialGradient(lx,ly,2,lx,ly,s*.42);glow.addColorStop(0,'rgba(255,244,177,.8)');glow.addColorStop(1,'rgba(255,244,177,0)');c.fillStyle=glow;c.fillRect(lx-s*.42,ly-s*.42,s*.84,s*.84);}
+    segment([[-.35,1.7,0],[.35,1.7,0]],sim.actuators.lamp?'#fff2a5':'#889b8e',7);
+
     // Dashes are an animated diagram, not a physical RF calculation.
     if(sim.config.showWaves&&sim.config.mode==='wireless'&&!sim.config.wirelessBreak){
-      if(sim.config.traffic<100&&sim.config.interference<100)for(const [x,z] of sim.positions)for(let j=0;j<7;j++){const t=(motion*.45+j/7)%1,t2=Math.min(1,t+.045);segment([[x+(1.16-x)*t,.81+.44*t+Math.sin(t*Math.PI)*.13,z+(1.22-z)*t],[x+(1.16-x)*t2,.81+.44*t2+Math.sin(t2*Math.PI)*.13,z+(1.22-z)*t2]],'#158fe9',3);}
+      if(sim.config.traffic<100&&sim.config.interference<100)sim.positions.forEach(([x,z],i)=>{const strength=7*wirelessSuccessChance(sim.config.traffic,sim.config.interference,Math.hypot(x,z)),whole=Math.floor(strength);for(let j=0;j<7;j++){if(!(j<whole||(j===whole&&(motion*3+i*.19)%1<strength-whole)))continue;const t=(motion*.45+j/7)%1,t2=Math.min(1,t+.045);segment([[x+(1.16-x)*t,.81+.44*t+Math.sin(t*Math.PI)*.13,z+(1.22-z)*t],[x+(1.16-x)*t2,.81+.44*t2+Math.sin(t2*Math.PI)*.13,z+(1.22-z)*t2]],'#158fe9',3);}});
       const noise=Math.ceil(Math.max(sim.config.interference,sim.config.traffic)*.30);for(let j=0;j<noise;j++){const phase=(motion*.6+j*.137)%1,x=-.9+((j*37)%180)/100,y=.6+((j*13)%80)/100,z=-1.25+phase*2.5;segment([[x,y,z],[x+.08,y+.05,z+.04]],'#e84d4d',3);}
     }
     for(let i=0;i<sim.positions.length;i++){let [x,z]=sim.positions[i],p=project(x,.7,z),q=project(x,.2,z);segment([[x,.2,z],[x,.7,z]],'#577268',2);c.beginPath();c.fillStyle=colors[i];c.arc(p[0],p[1],7,0,2*Math.PI);c.fill();c.strokeStyle='white';c.lineWidth=2;c.stroke();}

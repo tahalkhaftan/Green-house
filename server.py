@@ -16,8 +16,8 @@ def validate_weather(path: Path) -> bool:
         with path.open(encoding='utf-8') as handle:
             data = json.load(handle)
         rows = data.get('rows')
-        return (data.get('start_year') == 2021 and data.get('end_year') == 2025
-                and isinstance(rows, list) and len(rows) == 43824
+        return (data.get('start_year') == 2020 and data.get('end_year') == 2025
+                and isinstance(rows, list) and len(rows) == 52608
                 and all(isinstance(row, list) and len(row) >= 5 for row in rows))
     except (OSError, ValueError, TypeError, AttributeError):
         return False
@@ -25,7 +25,7 @@ def validate_weather(path: Path) -> bool:
 
 @lru_cache(maxsize=1)
 def weather_ready() -> bool:
-    return validate_weather(ROOT / 'public/weather-2021-2025.json')
+    return validate_weather(ROOT / 'public/weather-2020-2025.json')
 
 
 @app.get('/api/health')
@@ -35,7 +35,7 @@ def health():
               'model_available': (ROOT / 'public/model.json').exists(),
               'trace_available': (ROOT / 'public/trace.json').exists(),
               'weather_available': weather_available,
-              'release': 'multi-year-signals-2026-11-25-r2'}
+              'release': 'greenhouse-replay-mist-2026-11-25'}
     return JSONResponse(status, status_code=200 if weather_available else 503)
 
 

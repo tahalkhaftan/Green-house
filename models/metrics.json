@@ -1,9 +1,39 @@
 {
   "validation_mae_c": 0.78135,
+  "validation_mae_humidity_pct": 3.08726,
   "test_mae_c": 0.87702,
+  "test_mae_humidity_pct": 3.7167,
   "baseline_persistence_mae_c": 0.92062,
+  "baseline_persistence_mae_humidity_pct": 4.30341,
   "test_samples": 7139,
+  "humidity_test_samples": 7131,
   "training_rows": 47592,
+  "humidity_training_rows": 47534,
   "seed": 42,
-  "data_source": "https://huggingface.co/datasets/Okyanus/greenhouse-sensor-data/resolve/938eb7f272ab85e26ec1cbef11404eaea4cc151b/raw/agc2_reference.csv"
+  "data_source": "https://huggingface.co/datasets/Okyanus/greenhouse-sensor-data/resolve/938eb7f272ab85e26ec1cbef11404eaea4cc151b/raw/agc2_reference.csv",
+  "selected_hidden_layers": [
+    64,
+    32
+  ],
+  "validation_candidates": [
+    {
+      "hidden_layers": [
+        64,
+        32
+      ],
+      "score": 0.87623,
+      "mae_c": 0.83568,
+      "mae_humidity_pct": 3.08726
+    },
+    {
+      "hidden_layers": [
+        128,
+        64,
+        32
+      ],
+      "score": 0.90923,
+      "mae_c": 0.79691,
+      "mae_humidity_pct": 3.5211
+    }
+  ]
 }

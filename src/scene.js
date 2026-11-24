@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
-import { SENSOR_NAMES } from './simulation.js';
+import { wirelessSuccessChance } from './simulation.js';
 
 export function createScene(container, onMove, options={}) {
   const scene = new THREE.Scene(); scene.background = new THREE.Color('#e8f0e9');
@@ -13,7 +13,7 @@ export function createScene(container, onMove, options={}) {
   container.appendChild(renderer.domElement);
   const controls = options.controls || new OrbitControls(camera, renderer.domElement); controls.target.set(0, 1, 0); controls.enableDamping = true; controls.minDistance = 3.2; controls.maxDistance = 12; controls.maxPolarAngle = Math.PI * .49; controls.update();
   const light = new THREE.DirectionalLight('#fff6d8', 2.6); light.position.set(3, 7, 4); light.castShadow = true; light.shadow.mapSize.set(1024,1024); light.shadow.camera.left = -5; light.shadow.camera.right = 5; light.shadow.camera.top = 5; light.shadow.camera.bottom = -5; scene.add(light);
-  scene.add(new THREE.HemisphereLight('#f2f8e9', '#657d62', 2.2));
+  const skyLight=new THREE.HemisphereLight('#f2f8e9', '#657d62', 2.2);scene.add(skyLight);
   const mat = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: .8, ...extra });
   const mesh = (geometry, material, pos, parent=scene) => { const m = new THREE.Mesh(geometry,material); m.position.set(...pos); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m; };
   mesh(new THREE.BoxGeometry(2.7,.17,3.7), mat('#858e7b'), [0,-.1,0]);
@@ -83,17 +83,23 @@ export function createScene(container, onMove, options={}) {
   mesh(new THREE.SphereGeometry(.018,12,8),mat('#d5a94e'),[.22,.37,.13],heater);
   const heaterLight=new THREE.PointLight('#ffbf40',0,1.6,2);heaterLight.name='heater-light';heaterLight.position.set(0,.25,.35);heater.add(heaterLight);
   // Overhead irrigation pipe and nozzles; each drop is animated only while pumping.
-  const drops=[];const dropGeom=new THREE.SphereGeometry(.018,8,6),dropMat=new THREE.MeshBasicMaterial({color:'#36baf1',transparent:true,opacity:.82});
+  const drops=[];const dropGeom=new THREE.SphereGeometry(.026,8,6),dropMat=new THREE.MeshBasicMaterial({color:'#b4eaff',transparent:true,opacity:.55,depthWrite:false});
   const pipeMat=mat('#48645c',{metalness:.25});
   for(const x of [-.52,.52]){
     mesh(new THREE.BoxGeometry(.035,.035,2.45),pipeMat,[x,1.47,0]);
     for(const z of [-.72,.72]){
       mesh(new THREE.CylinderGeometry(.033,.045,.07,12),mat('#98a9a5'),[x,1.42,z]);
-      for(let j=0;j<8;j++){const d=mesh(dropGeom,dropMat,[x,1.4,z]);d.castShadow=false;d.name='sprinkler-drop';drops.push({mesh:d,x,z,j});}
+      for(let j=0;j<12;j++){const d=mesh(dropGeom,dropMat,[x,1.4,z]);d.castShadow=false;d.name='sprinkler-drop';drops.push({mesh:d,x,z,j});}
     }
   }
   mesh(new THREE.CylinderGeometry(.16,.16,.35,20),mat('#8cb7b6'),[-.75,.2,-1.26]);
-  for(const x of [-.52,.52])mesh(new THREE.BoxGeometry(.025,.025,2.4),mat('#263f38'),[x,.32,0]);
+  const irrigationMat=mat('#263f38',{emissive:'#168bd4',emissiveIntensity:0});
+  for(const x of [-.52,.52])mesh(new THREE.BoxGeometry(.025,.025,2.4),irrigationMat,[x,.32,0]);
+  // Supplemental grow light, visually and physically tied to the lamp actuator.
+  const lampGroup=new THREE.Group();lampGroup.position.set(0,1.72,0);scene.add(lampGroup);
+  mesh(new THREE.BoxGeometry(.70,.055,.18),mat('#6b7e73',{metalness:.5}),[0,0,0],lampGroup);
+  const lampMat=mat('#d8d2ad',{emissive:'#fff3b4',emissiveIntensity:0});const lampStrip=mesh(new THREE.BoxGeometry(.62,.018,.13),lampMat,[0,-.04,0],lampGroup);lampStrip.name='lamp-led';
+  const lampLight=new THREE.PointLight('#fff3ba',0,2.7,2);lampLight.name='lamp-light';lampLight.position.set(0,-.16,0);lampGroup.add(lampLight);
   // Controller enclosure and sensor markers.
   mesh(new THREE.BoxGeometry(.34,.25,.12),mat('#d8e4dc'),[1.09,1.25,1.15]);
   const board=mesh(new THREE.BoxGeometry(.23,.13,.015),mat('#285e53'),[1.16,1.25,1.22]);
@@ -139,12 +145,14 @@ export function createScene(container, onMove, options={}) {
       item.fruits.forEach(f=>f.visible=p.growth>.45);
       if(item.model){const scale=.22+p.growth*.68;item.model.scale.setScalar(scale);item.model.rotation.z=p.stress*.28;item.model.traverse(obj=>{if(obj.isMesh){for(const m of (Array.isArray(obj.material)?obj.material:[obj.material]))if(m.name.includes('leaf'))m.color.copy(m.userData.originalColor).lerp(new THREE.Color('#ad9c45'),p.stress*.8);}});}
     });
+    scene.background.set(sim.env.isDay?'#e8f0e9':'#172838');light.intensity=sim.env.isDay?2.6:.16;skyLight.intensity=sim.env.isDay?2.2:.45;
+    lampMat.emissiveIntensity=sim.actuators.lamp?2.2:0;lampLight.intensity=sim.actuators.lamp?3.2:0;irrigationMat.emissiveIntensity=sim.actuators.pump?.55:0;
     if(sim.actuators.fan&&running)fanRotor.rotation.z+=dt*9;
     heaterElement.emissiveIntensity=sim.actuators.heat?2.4:0;heaterLight.intensity=sim.actuators.heat?4.0:0;
-    for(const drop of drops){const phase=(motion*1.5+drop.j/8)%1,spread=(drop.j%2?1:-1)*.16*phase;drop.mesh.visible=sim.actuators.pump&&sim.env.water>0;drop.mesh.position.set(drop.x+spread,1.39-phase*.93,drop.z+Math.sin(drop.j*2.4)*.14*phase);}
+    for(const drop of drops){const phase=(motion*.7+drop.j/12)%1,spread=(drop.j%2?1:-1)*.16*phase;drop.mesh.visible=sim.actuators.mist&&sim.env.water>0;drop.mesh.position.set(drop.x+spread,1.39-phase*.93,drop.z+Math.sin(drop.j*2.4)*.14*phase);}
     const show=sim.config.showWaves&&sim.config.mode==='wireless'&&!sim.config.wirelessBreak;
     const transmitting=show&&sim.config.interference<100&&sim.config.traffic<100;
-    for(const d of packetDashes){d.mesh.visible=transmitting;if(!d.mesh.visible)continue;const p=sim.positions[d.i],t=(motion*.45+d.j/7)%1;pathStart.set(p[0],.81,p[1]);direction.copy(toController).sub(pathStart).normalize();d.mesh.position.copy(pathStart).lerp(toController,t);d.mesh.position.y+=Math.sin(t*Math.PI)*.13;d.mesh.quaternion.setFromUnitVectors(upVector,direction);}
+    for(const d of packetDashes){const p=sim.positions[d.i],strength=7*wirelessSuccessChance(sim.config.traffic,sim.config.interference,Math.hypot(...p)),whole=Math.floor(strength);d.mesh.visible=transmitting&&(d.j<whole||(d.j===whole&&(motion*3+d.i*.19)%1<strength-whole));if(!d.mesh.visible)continue;const t=(motion*.45+d.j/7)%1;pathStart.set(p[0],.81,p[1]);direction.copy(toController).sub(pathStart).normalize();d.mesh.position.copy(pathStart).lerp(toController,t);d.mesh.position.y+=Math.sin(t*Math.PI)*.13;d.mesh.quaternion.setFromUnitVectors(upVector,direction);}
     const interference=Math.max(sim.config.interference,sim.config.traffic)/100;
     for(const d of noiseDashes){d.mesh.visible=show&&d.j<Math.ceil(interference*noiseDashes.length);if(!d.mesh.visible)continue;const phase=(motion*.6+d.j*.137)%1;d.mesh.position.set(-.9+((d.j*37)%180)/100, .6+((d.j*13)%80)/100, -1.25+phase*2.5);d.mesh.rotation.set(.65,d.j*.9,1.0+d.j*.2);}
 

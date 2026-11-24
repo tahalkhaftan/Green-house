@@ -30,12 +30,13 @@ jobs:
           path: |
             public/model.json
             models/metrics.json
+            models/greenhouse_forecaster.pt
           retention-days: 90
       - name: Publish trained model to the repository
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add public/model.json public/trace.json models/metrics.json
+          git add public/model.json public/trace.json models/metrics.json models/greenhouse_forecaster.pt
           if ! git diff --cached --quiet; then
             git commit -m 'Update trained temperature model'
             git pull --rebase origin main

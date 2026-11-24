@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { Simulation } from '../src/simulation.js';
-const weather=JSON.parse(fs.readFileSync('public/weather-2021-2025.json','utf8'));
+const weather=JSON.parse(fs.readFileSync('public/weather-2020-2025.json','utf8'));
 const value=(name,defaultValue)=>{const n=Number(process.env[name]);return Number.isFinite(n)?n:defaultValue;};
 const simulation=new Simulation(weather,{interference:value('INTERFERENCE',25),traffic:value('TRAFFIC',15),mode:'wireless',years:value('YEARS',1)});
 simulation.step(simulation.totalMinutes);
@@ -8,6 +8,6 @@ const result=simulation.exportResult();
 result.github_run_id=process.env.GITHUB_RUN_ID||'local';
 fs.mkdirSync('results/runs',{recursive:true});
 const path=`results/runs/run-${result.github_run_id}.json`;
-fs.writeFileSync(path,JSON.stringify(result,null,2));
+fs.writeFileSync(path,JSON.stringify(result));
 fs.writeFileSync('results/latest.json',JSON.stringify({file:path,created_at:result.created_at,scenario:result.scenario,statistics:result.statistics},null,2));
 console.log('Result saved to',path,'wireless',simulation.summary('wireless').ratio.toFixed(2),'wired',simulation.summary('wired').ratio.toFixed(2),'reason',simulation.finishReason,'simulated hours',simulation.minutes/60);
