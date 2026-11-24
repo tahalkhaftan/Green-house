@@ -1,0 +1,43 @@
+name: Run greenhouse comparison
+on:
+  workflow_dispatch:
+    inputs:
+      interference:
+        description: 'Wireless interference (0–100)'
+        default: '25'
+      traffic:
+        description: 'Wireless channel load (0–100)'
+        default: '15'
+permissions:
+  contents: write
+concurrency:
+  group: greenhouse-repository-updates
+  cancel-in-progress: false
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compare wired and wireless for one simulated day
+        run: node scripts/run_batch.js
+        env:
+          INTERFERENCE: ${{ inputs.interference }}
+          TRAFFIC: ${{ inputs.traffic }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: simulation-results-${{ github.run_id }}
+          path: results/
+          retention-days: 90
+      - name: Save result to GitHub
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add results
+          if ! git diff --cached --quiet; then
+            git commit -m 'Save simulation results'
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
