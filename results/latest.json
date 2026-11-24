@@ -1,0 +1,75 @@
+{
+  "file": "results/runs/run-45480045095.json",
+  "created_at": "2026-11-24T20:22:06.958Z",
+  "scenario": {
+    "mode": "wireless",
+    "interference": 25,
+    "traffic": 15,
+    "sampleMinutes": 5,
+    "wiredBreak": false,
+    "automatic": true,
+    "scenario": "normal"
+  },
+  "statistics": {
+    "wired": {
+      "generated": 1445,
+      "delivered": 1445,
+      "retries": 2,
+      "packetLoss": 2,
+      "attempts": 1447,
+      "totalLatencyMs": 11590,
+      "maxLatencyMs": 23,
+      "lastLatencyMs": [
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "last": [
+        15.054338099661509,
+        77.39584230873739,
+        50.52576040233341,
+        0,
+        556.6280655271486
+      ],
+      "lastTime": [
+        1440,
+        1440,
+        1440,
+        1440,
+        1440
+      ]
+    },
+    "wireless": {
+      "generated": 1445,
+      "delivered": 1445,
+      "retries": 94,
+      "packetLoss": 94,
+      "attempts": 1539,
+      "totalLatencyMs": 46170,
+      "maxLatencyMs": 90,
+      "lastLatencyMs": [
+        30,
+        30,
+        30,
+        30,
+        30
+      ],
+      "last": [
+        15.054338099661509,
+        77.39584230873739,
+        50.52576040233341,
+        0,
+        556.6280655271486
+      ],
+      "lastTime": [
+        1440,
+        1440,
+        1440,
+        1440,
+        1440
+      ]
+    }
+  }
+}
