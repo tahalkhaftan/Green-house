@@ -3,10 +3,11 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
-import { wirelessSuccessChance } from './simulation.js';
+import { wirelessSuccessChance, wirelessDistance } from './simulation.js';
+import { packetVisual } from './radio-visual.js';
 
 export function createScene(container, onMove, options={}) {
-  const scene = new THREE.Scene(); scene.background = new THREE.Color('#b8dfee');
+  const scene = new THREE.Scene(); scene.background = new THREE.Color('#4f7089');
   const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100); camera.position.set(5.3, 4.6, 6.5);
   const renderer = options.renderer || new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -124,7 +125,7 @@ export function createScene(container, onMove, options={}) {
   }
   // Animated conceptual packet dashes. They indicate direction, not measured RF fields.
   const packetDashes=[],noiseDashes=[];
-  const dashGeometry=new THREE.CapsuleGeometry(.014,.065,2,5), blue=new THREE.MeshBasicMaterial({color:'#168ef0'}),red=new THREE.MeshBasicMaterial({color:'#ef5350'});
+  const dashGeometry=new THREE.CapsuleGeometry(.014,.065,2,5), blue=new THREE.MeshBasicMaterial({color:'#45b9ff'}),red=new THREE.MeshBasicMaterial({color:'#ff5555'});
   for(let i=0;i<5;i++)for(let j=0;j<7;j++){const d=mesh(dashGeometry,blue,[0,0,0]);d.castShadow=false;d.name='radio-data-dash';packetDashes.push({mesh:d,i,j});}
   for(let j=0;j<30;j++){const d=mesh(dashGeometry,red,[0,0,0]);d.castShadow=false;d.name='radio-noise-dash';noiseDashes.push({mesh:d,j});}
   const toController=new THREE.Vector3(1.16,1.25,1.22),upVector=new THREE.Vector3(0,1,0),pathStart=new THREE.Vector3(),direction=new THREE.Vector3();
@@ -162,7 +163,7 @@ export function createScene(container, onMove, options={}) {
     for(const drop of drops){const phase=(motion*.7+drop.j/12)%1,spread=(drop.j%2?1:-1)*.16*phase;drop.mesh.visible=sim.actuators.mist&&sim.env.water>0;drop.mesh.position.set(drop.x+spread,1.39-phase*.93,drop.z+Math.sin(drop.j*2.4)*.14*phase);}
     const show=sim.config.showWaves&&sim.config.mode==='wireless'&&!sim.config.wirelessBreak;
     const transmitting=show&&sim.config.interference<100&&sim.config.traffic<100;
-    for(const d of packetDashes){const p=sim.positions[d.i],strength=7*wirelessSuccessChance(sim.config.traffic,sim.config.interference,Math.hypot(...p)),whole=Math.floor(strength);d.mesh.visible=transmitting&&(d.j<whole||(d.j===whole&&(motion*3+d.i*.19)%1<strength-whole));if(!d.mesh.visible)continue;const t=(motion*.45+d.j/7)%1;pathStart.set(p[0],.81,p[1]);direction.copy(toController).sub(pathStart).normalize();d.mesh.position.copy(pathStart).lerp(toController,t);d.mesh.position.y+=Math.sin(t*Math.PI)*.13;d.mesh.quaternion.setFromUnitVectors(upVector,direction);}
+    for(const d of packetDashes){const p=sim.positions[d.i],chance=wirelessSuccessChance(sim.config.traffic,sim.config.interference,wirelessDistance(p)),packet=packetVisual(d.i,d.j,motion,chance);d.mesh.visible=transmitting&&packet.visible;if(!d.mesh.visible)continue;const t=packet.phase;pathStart.set(p[0],.81,p[1]);direction.copy(toController).sub(pathStart).normalize();d.mesh.position.copy(pathStart).lerp(toController,t);d.mesh.position.y+=Math.sin(t*Math.PI)*.13;d.mesh.quaternion.setFromUnitVectors(upVector,direction);}
     const interference=Math.max(sim.config.interference,sim.config.traffic)/100;
     for(const d of noiseDashes){d.mesh.visible=show&&d.j<Math.ceil(interference*noiseDashes.length);if(!d.mesh.visible)continue;const phase=(motion*.6+d.j*.137)%1;d.mesh.position.set(-.9+((d.j*37)%180)/100, .6+((d.j*13)%80)/100, -1.25+phase*2.5);d.mesh.rotation.set(.65,d.j*.9,1.0+d.j*.2);}
 

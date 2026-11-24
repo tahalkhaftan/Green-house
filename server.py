@@ -35,7 +35,7 @@ def health():
               'model_available': (ROOT / 'public/model.json').exists(),
               'trace_available': (ROOT / 'public/trace.json').exists(),
               'weather_available': weather_available,
-              'release': 'greenhouse-blue-sky-2026-11-25'}
+              'release': 'greenhouse-dusk-radio-2026-11-25'}
     return JSONResponse(status, status_code=200 if weather_available else 503)
 
 

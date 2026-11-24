@@ -13,12 +13,36 @@ const STAT_KEYS=['generated','delivered','retries','packetLoss','attempts','tota
 const HOURLY_COLUMNS=['minute','outside_temp_c','inside_temp_c','relative_humidity_pct','substrate_water_pct','ppfd','co2_ppm','reservoir_l','vpd_kpa','growth_index','stress_index','heater_on','fan_on','pump_on','cooler_on','received_temp','received_humidity','received_soil','received_light','received_co2','temp_age_min','humidity_age_min','soil_age_min','light_age_min','co2_age_min','lamp_on','fogger_on','outside_humidity_pct','outside_radiation_wm2','wind_kmh','rain_mm','dli','water_used_l','heater_kwh','lamp_kwh','fogger_water_l','daylight'];
 function randomSource(seed){let state=seed>>>0;return()=>{state=(Math.imul(1664525,state)+1013904223)>>>0;return state/4294967296;};}
 function freshStats(){return {generated:0,delivered:0,retries:0,packetLoss:0,attempts:0,totalLatencyMs:0,maxLatencyMs:0,queueDrops:0,lastLatencyMs:[null,null,null,null,null],last:[null,null,null,null,null],lastTime:[null,null,null,null,null]};}
-// Illustrative severity controls, not measured channel occupancy or a calibrated RF model.
+// This is an illustrative channel, not measured RF or a calibrated BLE model.
+// The optional PyTorch export approximates an explicitly synthetic collision
+// and interference model. Nonnegative network weights make its output monotone.
+let radioModel=null;const radioCache=new Map();
+export function configureRadioModel(model){
+ const layers=model?.layers;
+ const valid=model?.model_type==='monotone_pytorch_radio_surrogate'&&Array.isArray(layers)&&layers.length===3&&layers.every((layer,i)=>{
+  const inputs=[3,64,32][i],outputs=[64,32,1][i];
+  return Array.isArray(layer.weights)&&layer.weights.length===outputs&&Array.isArray(layer.bias)&&layer.bias.length===outputs&&layer.bias.every(Number.isFinite)&&layer.weights.every(row=>Array.isArray(row)&&row.length===inputs&&row.every(v=>Number.isFinite(v)&&v>=0));
+ });
+ radioModel=valid?model:null;radioCache.clear();return valid;
+}
+export function wirelessDistance(position){return Math.hypot(1.16-position[0],1.22-position[1],.44);}
+export function wirelessAttemptChance(traffic,interference,distance=0){
+ const load=clamp(Number(traffic)||0,0,100)/100,noise=clamp(Number(interference)||0,0,100)/100,d=clamp(Number(distance)||0,0,3.5);
+ const key=load.toFixed(4)+':'+noise.toFixed(4)+':'+d.toFixed(3);if(radioCache.has(key))return radioCache.get(key);
+ let hazard;
+ if(radioModel){
+  let values=[load,noise*noise,d/3.5];
+  for(const layer of radioModel.layers)values=layer.weights.map((row,i)=>{let sum=layer.bias[i];for(let j=0;j<row.length;j++)sum+=row[j]*values[j];return layer.activation==='relu'?Math.max(0,sum):sum;});
+  hazard=Math.max(0,values[0]);
+ }else hazard=2.7*load+1.5*noise*noise+.07*d;
+ const result=(1-noise)*Math.exp(-hazard);
+ if(radioCache.size>=256)radioCache.clear();radioCache.set(key,result);return result;
+}
 export function wirelessSuccessChance(traffic,interference,distance=0){
- const load=clamp(traffic,0,100)/100,noise=clamp(interference,0,100)/100;
+ const load=clamp(Number(traffic)||0,0,100)/100,noise=clamp(Number(interference)||0,0,100)/100;
  if(load>=1||noise>=1)return 0;
- const busy=load**1.25,attemptError=clamp(.005+.55*noise**2+.025*distance,0,1);
- return (1-busy)*(1-attemptError**3);
+ const q=wirelessAttemptChance(traffic,interference,distance);
+ return (1-load)*(1-(1-q)**3);
 }
 export function isDaylight(timestamp,latitude=35.6892,longitude=51.389){
  const date=new Date(timestamp),year=date.getUTCFullYear(),day=(timestamp-Date.UTC(year,0,1))/86400000+1;
@@ -94,9 +118,9 @@ export class Simulation{
  }
  takeSample(){const values=SENSOR_KEYS.map(k=>this.env[k]);
   for(let i=0;i<5;i++)for(const mode of ['wired','wireless']){
-   const s=this.stats[mode];s.generated++;const d=Math.hypot(...this.positions[i]),load=clamp(this.config.traffic,0,100)/100;
-   const cut=this.isLinkCut(mode),busy=mode==='wireless'&&(load>=1||this.config.interference>=100||this.rng[mode]()<load**1.25);
-   const p=mode==='wired'?.001:clamp(.005+.55*(this.config.interference/100)**2+.025*d,0,1);let success=false,tries=0;
+   const s=this.stats[mode];s.generated++;const d=wirelessDistance(this.positions[i]),load=clamp(this.config.traffic,0,100)/100;
+   const cut=this.isLinkCut(mode),busy=mode==='wireless'&&(load>=1||this.config.interference>=100||this.rng[mode]()<load);
+   const p=mode==='wired'?.001:1-wirelessAttemptChance(this.config.traffic,this.config.interference,d);let success=false,tries=0;
    if(cut||busy){s.queueDrops++;s.packetLoss++;}else for(let a=0;a<3;a++){tries++;s.attempts++;if(this.rng[mode]()>=p){success=true;break;}s.packetLoss++;if(a<2)s.retries++;}
    const latency=success?Math.round((mode==='wired'?8:25+.35*this.config.traffic)+(tries-1)*(mode==='wired'?15:30)):null;
    if(success){s.delivered++;s.last[i]=values[i];s.lastTime[i]=this.minutes;s.totalLatencyMs+=latency;s.maxLatencyMs=Math.max(s.maxLatencyMs,latency);s.lastLatencyMs[i]=latency;}

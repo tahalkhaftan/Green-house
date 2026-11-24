@@ -1,4 +1,5 @@
-import { wirelessSuccessChance } from './simulation.js';
+import { wirelessSuccessChance, wirelessDistance } from './simulation.js';
+import { packetVisual } from './radio-visual.js';
 // Isometric canvas fallback keeps the dashboard usable on devices without WebGL.
 export function createFallbackScene(container, onMove) {
   const canvas=document.createElement('canvas');canvas.style.cssText='width:100%;height:100%;display:block;touch-action:none;cursor:grab';container.append(canvas);
@@ -12,7 +13,7 @@ export function createFallbackScene(container, onMove) {
   function render(sim,running=false){
     const now=performance.now(),dt=Math.min(.05,Math.max(0,(now-lastTime)/1000));lastTime=now;if(running){motion+=dt;if(sim.actuators.fan)fanAngle+=dt*9;}
     current=sim;const {w,h,s}=metrics(), dpr=Math.min(devicePixelRatio||1,2);if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);}
-    c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);c.fillStyle='#b8dfee';c.fillRect(0,0,w,h);
+    c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);c.fillStyle='#4f7089';c.fillRect(0,0,w,h);
     // Sun or moon changes, while sky and ground retain the same colour and lighting.
     const sx=w*.16,sy=h*.26,r=Math.min(22,w*.045,h*.055);
     if(sim.env.isDay){c.fillStyle='#ffc74d';c.beginPath();c.arc(sx,sy,r,0,Math.PI*2);c.fill();c.strokeStyle='#f0b538';c.lineWidth=3;c.lineCap='round';for(let i=0;i<8;i++){const a=i*Math.PI/4;c.beginPath();c.moveTo(sx+Math.cos(a)*r*1.25,sy+Math.sin(a)*r*1.25);c.lineTo(sx+Math.cos(a)*r*1.58,sy+Math.sin(a)*r*1.58);c.stroke();}}
@@ -47,12 +48,12 @@ export function createFallbackScene(container, onMove) {
 
     // Dashes are an animated diagram, not a physical RF calculation.
     if(sim.config.showWaves&&sim.config.mode==='wireless'&&!sim.config.wirelessBreak){
-      if(sim.config.traffic<100&&sim.config.interference<100)sim.positions.forEach(([x,z],i)=>{const strength=7*wirelessSuccessChance(sim.config.traffic,sim.config.interference,Math.hypot(x,z)),whole=Math.floor(strength);for(let j=0;j<7;j++){if(!(j<whole||(j===whole&&(motion*3+i*.19)%1<strength-whole)))continue;const t=(motion*.45+j/7)%1,t2=Math.min(1,t+.045);segment([[x+(1.16-x)*t,.81+.44*t+Math.sin(t*Math.PI)*.13,z+(1.22-z)*t],[x+(1.16-x)*t2,.81+.44*t2+Math.sin(t2*Math.PI)*.13,z+(1.22-z)*t2]],'#158fe9',3);}});
+      if(sim.config.traffic<100&&sim.config.interference<100)sim.positions.forEach(([x,z],i)=>{const chance=wirelessSuccessChance(sim.config.traffic,sim.config.interference,wirelessDistance([x,z]));for(let j=0;j<7;j++){const packet=packetVisual(i,j,motion,chance);if(!packet.visible)continue;const t=packet.phase,t2=Math.min(1,t+.045);segment([[x+(1.16-x)*t,.81+.44*t+Math.sin(t*Math.PI)*.13,z+(1.22-z)*t],[x+(1.16-x)*t2,.81+.44*t2+Math.sin(t2*Math.PI)*.13,z+(1.22-z)*t2]],'#36aaff',3);}});
       const noise=Math.ceil(Math.max(sim.config.interference,sim.config.traffic)*.30);for(let j=0;j<noise;j++){const phase=(motion*.6+j*.137)%1,x=-.9+((j*37)%180)/100,y=.6+((j*13)%80)/100,z=-1.25+phase*2.5;segment([[x,y,z],[x+.08,y+.05,z+.04]],'#e84d4d',3);}
     }
     for(let i=0;i<sim.positions.length;i++){let [x,z]=sim.positions[i],p=project(x,.7,z),q=project(x,.2,z);segment([[x,.2,z],[x,.7,z]],'#577268',2);c.beginPath();c.fillStyle=colors[i];c.arc(p[0],p[1],7,0,2*Math.PI);c.fill();c.strokeStyle='white';c.lineWidth=2;c.stroke();}
     poly([[1,.9,.9],[1,1.2,.9],[1,1.2,1.2],[1,.9,1.2]],'#608579');
-    c.fillStyle='#789585';c.font='11px Tahoma';c.textAlign='left';c.fillText('نمای جایگزین • WebGL در دسترس نیست',15,metrics().h-48);
+    c.fillStyle='#dce8ee';c.font='11px Tahoma';c.textAlign='left';c.fillText('نمای جایگزین • WebGL در دسترس نیست',15,metrics().h-48);
   }
   function eventPos(e){const rect=canvas.getBoundingClientRect();return [e.clientX-rect.left,e.clientY-rect.top];}
   canvas.addEventListener('pointerdown',e=>{if(!current)return;const q=eventPos(e);let best=18;current.positions.forEach(([x,z],i)=>{const p=project(x,.7,z),d=Math.hypot(p[0]-q[0],p[1]-q[1]);if(d<best){best=d;drag=i;}});if(drag!==null)canvas.setPointerCapture(e.pointerId);});
