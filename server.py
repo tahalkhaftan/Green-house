@@ -10,7 +10,7 @@ app = FastAPI(title='Green-house', docs_url=None, redoc_url=None)
 
 @app.get('/api/health')
 def health():
-    return {'status': 'ok', 'model_available': (ROOT / 'public/model.json').exists(), 'trace_available': (ROOT / 'public/trace.json').exists()}
+    return {'status': 'ok', 'model_available': (ROOT / 'public/model.json').exists(), 'trace_available': (ROOT / 'public/trace.json').exists(), 'weather_available': (ROOT / 'public/weather-2023.json').exists(), 'release': 'yearly-greenhouse-2026-11-24'}
 
 
 @app.get('/')

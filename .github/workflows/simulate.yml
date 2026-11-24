@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Compare wired and wireless for one simulated day
+      - name: Compare wired and wireless for up to one simulated year
         run: node scripts/run_batch.js
         env:
           INTERFERENCE: ${{ inputs.interference }}

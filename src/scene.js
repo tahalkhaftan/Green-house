@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { SENSOR_NAMES } from './simulation.js';
 
 export function createScene(container, onMove) {
@@ -17,16 +20,16 @@ export function createScene(container, onMove) {
   mesh(new THREE.PlaneGeometry(25,25),mat('#dce9d9'),[0,-.2,0]).rotation.x=-Math.PI/2;
   // Greenhouse footprint is 2 x 3 metres. Frame reaches approximately 2 metres.
   const frame=mat('#788d82',{metalness:.65,roughness:.4});
-  for(const x of [-1,1]) for(const z of [-1.5,0,1.5]) mesh(new THREE.BoxGeometry(.04,1.9,.04),frame,[x,.95,z]);
+  for(const x of [-1,1]) for(const z of [-1.5,0,1.5]) mesh(new THREE.BoxGeometry(.04,1.6,.04),frame,[x,.8,z]);
   for(const z of [-1.5,0,1.5]) {
-    mesh(new THREE.BoxGeometry(2,.04,.04),frame,[0,1.88,z]);
-    for (const side of [-1,1]) {const beam=mesh(new THREE.BoxGeometry(1.12,.04,.04),frame,[side*.5,2.13,z]);beam.rotation.z=side*-.46;}
+    mesh(new THREE.BoxGeometry(2,.04,.04),frame,[0,1.59,z]);
+    for (const side of [-1,1]) {const beam=mesh(new THREE.BoxGeometry(1.08,.04,.04),frame,[side*.5,1.80,z]);beam.rotation.z=side*-.38;}
   }
-  for(const x of [-1,1]) {mesh(new THREE.BoxGeometry(.04,.04,3),frame,[x,1.88,0]);mesh(new THREE.BoxGeometry(.04,.04,3),frame,[x,.1,0]);}
-  mesh(new THREE.BoxGeometry(.04,.04,3),frame,[0,2.36,0]);
+  for(const x of [-1,1]) {mesh(new THREE.BoxGeometry(.04,.04,3),frame,[x,1.59,0]);mesh(new THREE.BoxGeometry(.04,.04,3),frame,[x,.1,0]);}
+  mesh(new THREE.BoxGeometry(.04,.04,3),frame,[0,2.0,0]);
   const glass=mat('#d0ede6',{transparent:true,opacity:.16,metalness:.05,roughness:.25,side:THREE.DoubleSide,depthWrite:false});
-  for(const x of [-1,1]) mesh(new THREE.PlaneGeometry(3,1.85),glass,[x,.95,0]).rotation.y=Math.PI/2;
-  for(const side of [-1,1]) {const roof=mesh(new THREE.PlaneGeometry(1.12,3),glass,[side*.5,2.13,0]);roof.rotation.x=-Math.PI/2;roof.rotation.y=side*.46;}
+  for(const x of [-1,1]) mesh(new THREE.PlaneGeometry(3,1.55),glass,[x,.8,0]).rotation.y=Math.PI/2;
+  for(const side of [-1,1]) {const roof=mesh(new THREE.PlaneGeometry(1.08,3),glass,[side*.5,1.80,0]);roof.rotation.x=-Math.PI/2;roof.rotation.y=side*.38;}
   const bedMat=mat('#d8c8ab'),soilMat=mat('#59443a');
   for(const x of [-.52,.52]) {mesh(new THREE.BoxGeometry(.76,.28,2.53),bedMat,[x,.12,0]);mesh(new THREE.BoxGeometry(.7,.045,2.45),soilMat,[x,.28,0]);}
   const plantGroups=[];
@@ -44,8 +47,29 @@ export function createScene(container, onMove) {
     }
     const fruits=[];
     for(let j=0;j<4;j++) {let t=mesh(new THREE.SphereGeometry(.065,12,10),mat('#d84a36'),[(j%2 ? .14 : -.12),.35+(j%3)*.12,(j<2 ? -.12 : .12)],growthGroup);fruits.push(t);}
-    plantGroups.push({growthGroup,leaves,fruits});
+    plantGroups.push({root,growthGroup,leaves,fruits,model:null});
   }
+  // CC0 textured tomato plant: compression and textures are decoded locally.
+  const ktx2=new KTX2Loader().setTranscoderPath('/basis/').detectSupport(renderer);
+  new GLTFLoader().setKTX2Loader(ktx2).setMeshoptDecoder(MeshoptDecoder).load('/tomato.glb', gltf=>{
+    const box=new THREE.Box3().setFromObject(gltf.scene),size=new THREE.Vector3();box.getSize(size);
+    if(!size.y)return;
+    for(const item of plantGroups){
+      const holder=new THREE.Group(),model=gltf.scene.clone(true);
+      model.scale.setScalar(1.1/size.y);model.position.y=-box.min.y*1.1/size.y;
+      model.traverse(obj=>{if(obj.isMesh){obj.castShadow=true;obj.receiveShadow=true;const mats=Array.isArray(obj.material)?obj.material:[obj.material];const cloned=mats.map(m=>{const n=m.clone();n.userData.originalColor=n.color.clone();return n;});obj.material=Array.isArray(obj.material)?cloned:cloned[0];}});
+      holder.add(model);item.root.add(holder);item.model=holder;item.growthGroup.visible=false;
+    }
+  },undefined,()=>{});
+  // Fan, heater, irrigation pipes and a cooling-water reservoir are visible equipment.
+  const fan=new THREE.Group();fan.position.set(1.01,1.18,-.92);fan.rotation.y=Math.PI/2;scene.add(fan);
+  mesh(new THREE.CylinderGeometry(.22,.22,.05,24),mat('#647e74'),[0,0,0],fan).rotation.x=Math.PI/2;
+  const fanRotor=new THREE.Group();fanRotor.position.z=.04;fan.add(fanRotor);
+  for(let b=0;b<4;b++){const blade=mesh(new THREE.BoxGeometry(.05,.17,.025),mat('#d3e1d6'),[0,.1,0],fanRotor);blade.rotation.z=b*Math.PI/2;blade.position.set(-Math.sin(b*Math.PI/2)*.09,Math.cos(b*Math.PI/2)*.09,0);}
+  const heater=mesh(new THREE.BoxGeometry(.5,.3,.12),mat('#d7c7b0',{emissive:'#9a3019',emissiveIntensity:0}),[.57,.35,-1.30]);
+  for(let i=0;i<5;i++)mesh(new THREE.BoxGeometry(.035,.25,.02),mat('#b6a795'),[.4+i*.08,.35,-1.22]);
+  mesh(new THREE.CylinderGeometry(.16,.16,.35,20),mat('#8cb7b6'),[-.75,.2,-1.26]);
+  for(const x of [-.52,.52])mesh(new THREE.BoxGeometry(.025,.025,2.4),mat('#263f38'),[x,.32,0]);
   // Controller enclosure and sensor markers.
   mesh(new THREE.BoxGeometry(.34,.25,.12),mat('#d8e4dc'),[1.09,1.25,1.15]);
   const board=mesh(new THREE.BoxGeometry(.23,.13,.015),mat('#285e53'),[1.16,1.25,1.22]);
@@ -81,7 +105,9 @@ export function createScene(container, onMove) {
       const item=plantGroups[i];const s=.42+p.growth*.7;item.growthGroup.scale.set(s,s,s);
       item.leaves.forEach(({pivot,leaf},j)=>{pivot.rotation.z=-(.15+p.stress*.9);leaf.material.color.set(p.stress>.55?'#9b9d49':'#548e46');});
       item.fruits.forEach(f=>f.visible=p.growth>.45);
+      if(item.model){const scale=.22+p.growth*.68;item.model.scale.setScalar(scale);item.model.rotation.z=p.stress*.28;item.model.traverse(obj=>{if(obj.isMesh){for(const m of (Array.isArray(obj.material)?obj.material:[obj.material]))if(m.name.includes('leaf'))m.color.copy(m.userData.originalColor).lerp(new THREE.Color('#ad9c45'),p.stress*.8);}});}
     });
+    if(sim.actuators.fan)fanRotor.rotation.z+=.09;heater.material.emissiveIntensity=sim.actuators.heat?.75:0;
     controls.update();renderer.render(scene,camera);
   }
   renderer.domElement.style.cursor='grab';return {render,markers};
