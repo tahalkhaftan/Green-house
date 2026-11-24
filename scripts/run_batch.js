@@ -1,0 +1,13 @@
+import fs from 'node:fs';
+import { Simulation } from '../src/simulation.js';
+const trace=JSON.parse(fs.readFileSync('public/trace.json','utf8'));
+const value=(name,defaultValue)=>{const n=Number(process.env[name]);return Number.isFinite(n)?n:defaultValue;};
+const simulation=new Simulation(trace,{interference:value('INTERFERENCE',25),traffic:value('TRAFFIC',15),mode:'wireless'});
+simulation.step(24*60);
+const result=simulation.exportResult();
+result.github_run_id=process.env.GITHUB_RUN_ID||'local';
+fs.mkdirSync('results/runs',{recursive:true});
+const path=`results/runs/run-${result.github_run_id}.json`;
+fs.writeFileSync(path,JSON.stringify(result,null,2));
+fs.writeFileSync('results/latest.json',JSON.stringify({file:path,created_at:result.created_at,scenario:result.scenario,statistics:result.statistics},null,2));
+console.log('Result saved to',path,'wireless',simulation.summary('wireless').ratio.toFixed(2),'wired',simulation.summary('wired').ratio.toFixed(2));
