@@ -1,6 +1,6 @@
 """Fit a temperature forecaster to historical greenhouse sensor readings."""
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 import csv
 import json
 import math
@@ -26,7 +26,7 @@ def read_samples():
         for row in csv.DictReader(file):
             try:
                 datum = [float(row[k]) for k in ('temperature', 'humidity', 'co2', 'light')]
-                timestamp = datetime.fromisoformat(row['timestamp'].strip()[:26]).timestamp()
+                timestamp = datetime.fromisoformat(row['timestamp'].strip()[:26]).replace(tzinfo=timezone.utc).timestamp()
                 if not all(math.isfinite(x) for x in datum):
                     continue
                 if not (-10 <= datum[0] <= 60 and 0 <= datum[1] <= 100 and 0 <= datum[2] <= 10000 and 0 <= datum[3] <= 4000):
