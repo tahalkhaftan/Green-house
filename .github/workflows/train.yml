@@ -1,0 +1,43 @@
+name: Train greenhouse PyTorch model
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['ml/**', '.github/workflows/train.yml']
+permissions:
+  contents: write
+concurrency:
+  group: greenhouse-repository-updates
+  cancel-in-progress: false
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PyTorch CPU
+        run: pip install torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+      - name: Prepare real-data trace and train
+        run: |
+          python ml/prepare.py
+          python ml/train.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: greenhouse-trained-model
+          path: |
+            public/model.json
+            models/metrics.json
+          retention-days: 90
+      - name: Publish trained model to the repository
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/model.json public/trace.json models/metrics.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Update trained temperature model'
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi
