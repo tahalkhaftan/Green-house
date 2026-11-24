@@ -1,9 +1,9 @@
 {
-  "validation_mae_c": 0.77696,
-  "test_mae_c": 0.87201,
-  "baseline_persistence_mae_c": 0.92088,
-  "test_samples": 7137,
-  "training_rows": 47577,
+  "validation_mae_c": 0.78135,
+  "test_mae_c": 0.87702,
+  "baseline_persistence_mae_c": 0.92062,
+  "test_samples": 7139,
+  "training_rows": 47592,
   "seed": 42,
   "data_source": "https://huggingface.co/datasets/Okyanus/greenhouse-sensor-data/resolve/938eb7f272ab85e26ec1cbef11404eaea4cc151b/raw/agc2_reference.csv"
 }
