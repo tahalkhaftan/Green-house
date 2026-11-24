@@ -1,8 +1,8 @@
 {
   "validation_mae_c": 0.78135,
-  "validation_mae_humidity_pct": 3.08726,
+  "validation_mae_humidity_pct": 3.09091,
   "test_mae_c": 0.87702,
-  "test_mae_humidity_pct": 3.7167,
+  "test_mae_humidity_pct": 3.71356,
   "baseline_persistence_mae_c": 0.92062,
   "baseline_persistence_mae_humidity_pct": 4.30341,
   "test_samples": 7139,
@@ -21,9 +21,9 @@
         64,
         32
       ],
-      "score": 0.87623,
-      "mae_c": 0.83568,
-      "mae_humidity_pct": 3.08726
+      "score": 0.8752,
+      "mae_c": 0.83308,
+      "mae_humidity_pct": 3.09091
     },
     {
       "hidden_layers": [
