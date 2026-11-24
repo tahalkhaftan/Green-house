@@ -19,4 +19,8 @@ test('3D equipment, day/night, and radio dashes follow simulation state',()=>{
  sim.setLinkCut('wireless',true);sim.actuators.mist=false;sim.actuators.heat=false;sim.actuators.lamp=false;clock+=40;view.render(sim,true);
  assert.equal(count(),0);assert.equal(noise.visible,false);assert.equal(drop.visible,false);assert.equal(heat.material.emissiveIntensity,0);assert.equal(lampLight.intensity,0);
  sim.actuators.fan=false;const stopped=fan.rotation.z;clock+=40;view.render(sim,true);assert.equal(fan.rotation.z,stopped);
+ const sun=scene.getObjectByName('sky-sun'),moon=scene.getObjectByName('sky-moon'),ambient=scene.getObjectByName('ambient-sky-light'),sunlight=scene.getObjectByName('ambient-sun-light');
+ sim.env.isDay=false;view.render(sim,false);assert.equal(sun.visible,false);assert.equal(moon.visible,true);
+ const colour=scene.background.getHexString(),brightness=[ambient.intensity,sunlight.intensity];
+ sim.env.isDay=true;view.render(sim,false);assert.equal(sun.visible,true);assert.equal(moon.visible,false);assert.equal(scene.background.getHexString(),colour);assert.deepEqual([ambient.intensity,sunlight.intensity],brightness);
 });

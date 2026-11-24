@@ -6,14 +6,23 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 import { wirelessSuccessChance } from './simulation.js';
 
 export function createScene(container, onMove, options={}) {
-  const scene = new THREE.Scene(); scene.background = new THREE.Color('#e8f0e9');
+  const scene = new THREE.Scene(); scene.background = new THREE.Color('#b8dfee');
   const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100); camera.position.set(5.3, 4.6, 6.5);
   const renderer = options.renderer || new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.outputColorSpace = THREE.SRGBColorSpace;
   container.appendChild(renderer.domElement);
   const controls = options.controls || new OrbitControls(camera, renderer.domElement); controls.target.set(0, 1, 0); controls.enableDamping = true; controls.minDistance = 3.2; controls.maxDistance = 12; controls.maxPolarAngle = Math.PI * .49; controls.update();
   const light = new THREE.DirectionalLight('#fff6d8', 2.6); light.position.set(3, 7, 4); light.castShadow = true; light.shadow.mapSize.set(1024,1024); light.shadow.camera.left = -5; light.shadow.camera.right = 5; light.shadow.camera.top = 5; light.shadow.camera.bottom = -5; scene.add(light);
-  const skyLight=new THREE.HemisphereLight('#f2f8e9', '#657d62', 2.2);scene.add(skyLight);
+  const skyLight=new THREE.HemisphereLight('#f2f8e9', '#657d62', 2.2);skyLight.name='ambient-sky-light';scene.add(skyLight);light.name='ambient-sun-light';
+  // The sky is deliberately constant: the symbols are illustrations, not light sources.
+  scene.add(camera);
+  const skyMarker=new THREE.Group();skyMarker.name='sky-marker';camera.add(skyMarker);
+  const sun=new THREE.Group();sun.name='sky-sun';skyMarker.add(sun);
+  const skyMat=color=>new THREE.MeshBasicMaterial({color,depthTest:false,depthWrite:false});
+  const sunDisk=new THREE.Mesh(new THREE.CircleGeometry(.15,40),skyMat('#ffc74d'));sunDisk.renderOrder=900;sun.add(sunDisk);
+  for(let i=0;i<8;i++){const a=i*Math.PI/4,ray=new THREE.Mesh(new THREE.BoxGeometry(.028,.073,.01),skyMat('#f0b538'));ray.position.set(Math.sin(a)*.226,Math.cos(a)*.226,0);ray.rotation.z=-a;ray.renderOrder=900;sun.add(ray);}
+  const moonShape=new THREE.Shape();moonShape.moveTo(.077,.172);moonShape.absarc(0,0,.188,1.15,5.133,false);moonShape.quadraticCurveTo(-.055,0,.077,.172);moonShape.closePath();
+  const moon=new THREE.Mesh(new THREE.ShapeGeometry(moonShape,32),skyMat('#fff8df'));moon.name='sky-moon';moon.renderOrder=900;skyMarker.add(moon);
   const mat = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: .8, ...extra });
   const mesh = (geometry, material, pos, parent=scene) => { const m = new THREE.Mesh(geometry,material); m.position.set(...pos); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m; };
   mesh(new THREE.BoxGeometry(2.7,.17,3.7), mat('#858e7b'), [0,-.1,0]);
@@ -145,7 +154,8 @@ export function createScene(container, onMove, options={}) {
       item.fruits.forEach(f=>f.visible=p.growth>.45);
       if(item.model){const scale=.22+p.growth*.68;item.model.scale.setScalar(scale);item.model.rotation.z=p.stress*.28;item.model.traverse(obj=>{if(obj.isMesh){for(const m of (Array.isArray(obj.material)?obj.material:[obj.material]))if(m.name.includes('leaf'))m.color.copy(m.userData.originalColor).lerp(new THREE.Color('#ad9c45'),p.stress*.8);}});}
     });
-    scene.background.set(sim.env.isDay?'#e8f0e9':'#172838');light.intensity=sim.env.isDay?2.6:.16;skyLight.intensity=sim.env.isDay?2.2:.45;
+    const halfHeight=5*Math.tan(THREE.MathUtils.degToRad(camera.fov/2));skyMarker.position.set(-.68*halfHeight*camera.aspect,.48*halfHeight,-5);
+    sun.visible=!!sim.env.isDay;moon.visible=!sim.env.isDay;
     lampMat.emissiveIntensity=sim.actuators.lamp?2.2:0;lampLight.intensity=sim.actuators.lamp?3.2:0;irrigationMat.emissiveIntensity=sim.actuators.pump?.55:0;
     if(sim.actuators.fan&&running)fanRotor.rotation.z+=dt*9;
     heaterElement.emissiveIntensity=sim.actuators.heat?2.4:0;heaterLight.intensity=sim.actuators.heat?4.0:0;

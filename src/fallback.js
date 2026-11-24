@@ -12,7 +12,12 @@ export function createFallbackScene(container, onMove) {
   function render(sim,running=false){
     const now=performance.now(),dt=Math.min(.05,Math.max(0,(now-lastTime)/1000));lastTime=now;if(running){motion+=dt;if(sim.actuators.fan)fanAngle+=dt*9;}
     current=sim;const {w,h,s}=metrics(), dpr=Math.min(devicePixelRatio||1,2);if(canvas.width!==Math.round(w*dpr)||canvas.height!==Math.round(h*dpr)){canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);}
-    c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);c.fillStyle=sim.env.isDay?'#e8f0e9':'#263c4b';c.fillRect(0,0,w,h);
+    c.setTransform(dpr,0,0,dpr,0,0);c.clearRect(0,0,w,h);c.fillStyle='#b8dfee';c.fillRect(0,0,w,h);
+    // Sun or moon changes, while sky and ground retain the same colour and lighting.
+    const sx=w*.16,sy=h*.26,r=Math.min(22,w*.045,h*.055);
+    if(sim.env.isDay){c.fillStyle='#ffc74d';c.beginPath();c.arc(sx,sy,r,0,Math.PI*2);c.fill();c.strokeStyle='#f0b538';c.lineWidth=3;c.lineCap='round';for(let i=0;i<8;i++){const a=i*Math.PI/4;c.beginPath();c.moveTo(sx+Math.cos(a)*r*1.25,sy+Math.sin(a)*r*1.25);c.lineTo(sx+Math.cos(a)*r*1.58,sy+Math.sin(a)*r*1.58);c.stroke();}}
+    else{c.fillStyle='#fff8df';c.beginPath();c.arc(sx,sy,r,-1.15,1.15,true);c.quadraticCurveTo(sx-r*.3,sy,sx+Math.cos(1.15)*r,sy-Math.sin(1.15)*r);c.closePath();c.fill();}
+
     poly([[-1.2,0,-1.65],[1.2,0,-1.65],[1.2,0,1.65],[-1.2,0,1.65]],'#c2cfbd');
     poly([[-1,0,-1.5],[-1,1.6,-1.5],[1,1.6,-1.5],[1,0,-1.5]],'rgba(199,231,218,.30)');
     poly([[-1,1.6,-1.5],[0,2,-1.5],[0,2,1.5],[-1,1.6,1.5]],'rgba(222,244,235,.40)');
