@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import { Simulation } from '../src/simulation.js';
-const weather=JSON.parse(fs.readFileSync('public/weather-2023.json','utf8'));
+const weather=JSON.parse(fs.readFileSync('public/weather-2021-2025.json','utf8'));
 const value=(name,defaultValue)=>{const n=Number(process.env[name]);return Number.isFinite(n)?n:defaultValue;};
-const simulation=new Simulation(weather,{interference:value('INTERFERENCE',25),traffic:value('TRAFFIC',15),mode:'wireless'});
-simulation.step(365*24*60);
+const simulation=new Simulation(weather,{interference:value('INTERFERENCE',25),traffic:value('TRAFFIC',15),mode:'wireless',years:value('YEARS',1)});
+simulation.step(simulation.totalMinutes);
 const result=simulation.exportResult();
 result.github_run_id=process.env.GITHUB_RUN_ID||'local';
 fs.mkdirSync('results/runs',{recursive:true});

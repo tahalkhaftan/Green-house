@@ -2,6 +2,11 @@ name: Run greenhouse comparison
 on:
   workflow_dispatch:
     inputs:
+      years:
+        description: 'Simulation duration in calendar years (1–5)'
+        type: choice
+        options: ['1', '2', '3', '4', '5']
+        default: '1'
       interference:
         description: 'Wireless interference (0–100)'
         default: '25'
@@ -21,9 +26,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Compare wired and wireless for up to one simulated year
+      - name: Compare wired and wireless for up to five simulated years
         run: node scripts/run_batch.js
         env:
+          YEARS: ${{ inputs.years }}
           INTERFERENCE: ${{ inputs.interference }}
           TRAFFIC: ${{ inputs.traffic }}
       - uses: actions/upload-artifact@v4

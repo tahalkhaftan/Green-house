@@ -5,13 +5,13 @@ import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { SENSOR_NAMES } from './simulation.js';
 
-export function createScene(container, onMove) {
+export function createScene(container, onMove, options={}) {
   const scene = new THREE.Scene(); scene.background = new THREE.Color('#e8f0e9');
   const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100); camera.position.set(5.3, 4.6, 6.5);
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  const renderer = options.renderer || new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.outputColorSpace = THREE.SRGBColorSpace;
   container.appendChild(renderer.domElement);
-  const controls = new OrbitControls(camera, renderer.domElement); controls.target.set(0, 1, 0); controls.enableDamping = true; controls.minDistance = 3.2; controls.maxDistance = 12; controls.maxPolarAngle = Math.PI * .49; controls.update();
+  const controls = options.controls || new OrbitControls(camera, renderer.domElement); controls.target.set(0, 1, 0); controls.enableDamping = true; controls.minDistance = 3.2; controls.maxDistance = 12; controls.maxPolarAngle = Math.PI * .49; controls.update();
   const light = new THREE.DirectionalLight('#fff6d8', 2.6); light.position.set(3, 7, 4); light.castShadow = true; light.shadow.mapSize.set(1024,1024); light.shadow.camera.left = -5; light.shadow.camera.right = 5; light.shadow.camera.top = 5; light.shadow.camera.bottom = -5; scene.add(light);
   scene.add(new THREE.HemisphereLight('#f2f8e9', '#657d62', 2.2));
   const mat = (color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: .8, ...extra });
@@ -50,6 +50,7 @@ export function createScene(container, onMove) {
     plantGroups.push({root,growthGroup,leaves,fruits,model:null});
   }
   // CC0 textured tomato plant: compression and textures are decoded locally.
+  if(options.loadAssets!==false){
   const ktx2=new KTX2Loader().setTranscoderPath('/basis/').detectSupport(renderer);
   new GLTFLoader().setKTX2Loader(ktx2).setMeshoptDecoder(MeshoptDecoder).load('/tomato.glb', gltf=>{
     const box=new THREE.Box3().setFromObject(gltf.scene),size=new THREE.Vector3();box.getSize(size);
@@ -61,13 +62,36 @@ export function createScene(container, onMove) {
       holder.add(model);item.root.add(holder);item.model=holder;item.growthGroup.visible=false;
     }
   },undefined,()=>{});
-  // Fan, heater, irrigation pipes and a cooling-water reservoir are visible equipment.
+  }
+  // Wall-mounted ventilation fan with a rotating motor and protective rim.
   const fan=new THREE.Group();fan.position.set(1.01,1.18,-.92);fan.rotation.y=Math.PI/2;scene.add(fan);
-  mesh(new THREE.CylinderGeometry(.22,.22,.05,24),mat('#647e74'),[0,0,0],fan).rotation.x=Math.PI/2;
-  const fanRotor=new THREE.Group();fanRotor.position.z=.04;fan.add(fanRotor);
-  for(let b=0;b<4;b++){const blade=mesh(new THREE.BoxGeometry(.05,.17,.025),mat('#d3e1d6'),[0,.1,0],fanRotor);blade.rotation.z=b*Math.PI/2;blade.position.set(-Math.sin(b*Math.PI/2)*.09,Math.cos(b*Math.PI/2)*.09,0);}
-  const heater=mesh(new THREE.BoxGeometry(.5,.3,.12),mat('#d7c7b0',{emissive:'#9a3019',emissiveIntensity:0}),[.57,.35,-1.30]);
-  for(let i=0;i<5;i++)mesh(new THREE.BoxGeometry(.035,.25,.02),mat('#b6a795'),[.4+i*.08,.35,-1.22]);
+  mesh(new THREE.BoxGeometry(.51,.51,.06),mat('#879f91',{metalness:.45}),[0,0,0],fan);
+  mesh(new THREE.CylinderGeometry(.22,.22,.07,32),mat('#334d44'),[0,0,.04],fan).rotation.x=Math.PI/2;
+  const fanRotor=new THREE.Group();fanRotor.name='fan-rotor';fanRotor.position.z=.085;fan.add(fanRotor);
+  for(let b=0;b<4;b++){const angle=b*Math.PI/2,blade=mesh(new THREE.BoxGeometry(.075,.17,.018),mat('#dce8de',{metalness:.45}),[-Math.sin(angle)*.09,Math.cos(angle)*.09,0],fanRotor);blade.rotation.z=angle+.25;}
+  mesh(new THREE.SphereGeometry(.035,12,8),mat('#b8c7bb'),[0,0,.02],fanRotor);
+  const fanRim=mesh(new THREE.TorusGeometry(.205,.012,8,32),mat('#d3dfd3',{metalness:.5}),[0,0,.11],fan);
+  // Detailed electric radiant heater: dark grille, yellow elements and warm light.
+  const heater=new THREE.Group();heater.position.set(.57,.18,-1.24);scene.add(heater);
+  const metal=mat('#c8c8b7',{metalness:.55,roughness:.45});
+  mesh(new THREE.BoxGeometry(.58,.40,.22),metal,[0,.22,0],heater);
+  mesh(new THREE.BoxGeometry(.49,.27,.015),mat('#343831',{metalness:.15}),[0,.23,.119],heater);
+  const heaterElement=mat('#927845',{emissive:'#ffc34a',emissiveIntensity:0,metalness:.15});
+  for(let i=0;i<6;i++){const element=mesh(new THREE.BoxGeometry(.043,.225,.014),heaterElement,[-.18+i*.072,.23,.13],heater);element.name='heater-element';}
+  for(let i=0;i<4;i++)mesh(new THREE.BoxGeometry(.49,.013,.012),mat('#b6b9aa',{metalness:.7}),[0,.13+i*.065,.147],heater);
+  mesh(new THREE.BoxGeometry(.62,.045,.26),mat('#596b5e',{metalness:.4}),[0,.025,0],heater);
+  mesh(new THREE.SphereGeometry(.018,12,8),mat('#d5a94e'),[.22,.37,.13],heater);
+  const heaterLight=new THREE.PointLight('#ffbf40',0,1.6,2);heaterLight.name='heater-light';heaterLight.position.set(0,.25,.35);heater.add(heaterLight);
+  // Overhead irrigation pipe and nozzles; each drop is animated only while pumping.
+  const drops=[];const dropGeom=new THREE.SphereGeometry(.018,8,6),dropMat=new THREE.MeshBasicMaterial({color:'#36baf1',transparent:true,opacity:.82});
+  const pipeMat=mat('#48645c',{metalness:.25});
+  for(const x of [-.52,.52]){
+    mesh(new THREE.BoxGeometry(.035,.035,2.45),pipeMat,[x,1.47,0]);
+    for(const z of [-.72,.72]){
+      mesh(new THREE.CylinderGeometry(.033,.045,.07,12),mat('#98a9a5'),[x,1.42,z]);
+      for(let j=0;j<8;j++){const d=mesh(dropGeom,dropMat,[x,1.4,z]);d.castShadow=false;d.name='sprinkler-drop';drops.push({mesh:d,x,z,j});}
+    }
+  }
   mesh(new THREE.CylinderGeometry(.16,.16,.35,20),mat('#8cb7b6'),[-.75,.2,-1.26]);
   for(const x of [-.52,.52])mesh(new THREE.BoxGeometry(.025,.025,2.4),mat('#263f38'),[x,.32,0]);
   // Controller enclosure and sensor markers.
@@ -83,6 +107,12 @@ export function createScene(container, onMove) {
     const ring=mesh(new THREE.TorusGeometry(.115,.012,6,24),mat('#ffffff'),[0,.5,0],g);ring.userData.sensorIndex=i;ring.rotation.x=Math.PI/2;
     markers.push(g);
   }
+  // Animated conceptual packet dashes. They indicate direction, not measured RF fields.
+  const packetDashes=[],noiseDashes=[];
+  const dashGeometry=new THREE.CapsuleGeometry(.014,.065,2,5), blue=new THREE.MeshBasicMaterial({color:'#168ef0'}),red=new THREE.MeshBasicMaterial({color:'#ef5350'});
+  for(let i=0;i<5;i++)for(let j=0;j<7;j++){const d=mesh(dashGeometry,blue,[0,0,0]);d.castShadow=false;d.name='radio-data-dash';packetDashes.push({mesh:d,i,j});}
+  for(let j=0;j<30;j++){const d=mesh(dashGeometry,red,[0,0,0]);d.castShadow=false;d.name='radio-noise-dash';noiseDashes.push({mesh:d,j});}
+  const toController=new THREE.Vector3(1.16,1.25,1.22),upVector=new THREE.Vector3(0,1,0),pathStart=new THREE.Vector3(),direction=new THREE.Vector3();
   const cables=new THREE.Group();scene.add(cables);
   function setCables(positions,mode) {
     cables.clear(); if(mode!=='wired')return;
@@ -96,9 +126,11 @@ export function createScene(container, onMove) {
   renderer.domElement.addEventListener('pointerdown',e=>{updatePointer(e);const hits=ray.intersectObjects(group.children,true);if(hits.length){drag=hits[0].object.userData.sensorIndex;controls.enabled=false;renderer.domElement.setPointerCapture(e.pointerId);renderer.domElement.style.cursor='grabbing';}});
   renderer.domElement.addEventListener('pointermove',e=>{if(drag===null)return;updatePointer(e);if(ray.ray.intersectPlane(dragPlane,at)){onMove(drag,[THREE.MathUtils.clamp(at.x,-.9,.9),THREE.MathUtils.clamp(at.z,-1.35,1.35)]);}});
   const release=()=>{drag=null;controls.enabled=true;renderer.domElement.style.cursor='grab';};renderer.domElement.addEventListener('pointerup',release);renderer.domElement.addEventListener('pointercancel',release);
-  const observer=new ResizeObserver(()=>{const w=container.clientWidth,h=container.clientHeight;if(!w||!h)return;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);});observer.observe(container);
-  let oldMode='';let oldCoords='';
-  function render(sim) {
+  if(options.observeResize!==false){const observer=new ResizeObserver(()=>{const w=container.clientWidth,h=container.clientHeight;if(!w||!h)return;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);});observer.observe(container);}
+  const clock=options.clock||(()=>performance.now());
+  let oldMode='';let oldCoords='';let motion=0,lastTime=clock();
+  function render(sim,running=false) {
+    const now=clock(),dt=Math.min(.05,Math.max(0,(now-lastTime)/1000));lastTime=now;if(running)motion+=dt;
     sim.positions.forEach((p,i)=>markers[i].position.set(p[0],.31,p[1]));
     const coords=JSON.stringify(sim.positions);if(oldMode!==sim.config.mode||oldCoords!==coords){setCables(sim.positions,sim.config.mode);oldMode=sim.config.mode;oldCoords=coords;}
     sim.plants.forEach((p,i)=>{
@@ -107,7 +139,15 @@ export function createScene(container, onMove) {
       item.fruits.forEach(f=>f.visible=p.growth>.45);
       if(item.model){const scale=.22+p.growth*.68;item.model.scale.setScalar(scale);item.model.rotation.z=p.stress*.28;item.model.traverse(obj=>{if(obj.isMesh){for(const m of (Array.isArray(obj.material)?obj.material:[obj.material]))if(m.name.includes('leaf'))m.color.copy(m.userData.originalColor).lerp(new THREE.Color('#ad9c45'),p.stress*.8);}});}
     });
-    if(sim.actuators.fan)fanRotor.rotation.z+=.09;heater.material.emissiveIntensity=sim.actuators.heat?.75:0;
+    if(sim.actuators.fan&&running)fanRotor.rotation.z+=dt*9;
+    heaterElement.emissiveIntensity=sim.actuators.heat?2.4:0;heaterLight.intensity=sim.actuators.heat?4.0:0;
+    for(const drop of drops){const phase=(motion*1.5+drop.j/8)%1,spread=(drop.j%2?1:-1)*.16*phase;drop.mesh.visible=sim.actuators.pump&&sim.env.water>0;drop.mesh.position.set(drop.x+spread,1.39-phase*.93,drop.z+Math.sin(drop.j*2.4)*.14*phase);}
+    const show=sim.config.showWaves&&sim.config.mode==='wireless'&&!sim.config.wirelessBreak;
+    const transmitting=show&&sim.config.interference<100&&sim.config.traffic<100;
+    for(const d of packetDashes){d.mesh.visible=transmitting;if(!d.mesh.visible)continue;const p=sim.positions[d.i],t=(motion*.45+d.j/7)%1;pathStart.set(p[0],.81,p[1]);direction.copy(toController).sub(pathStart).normalize();d.mesh.position.copy(pathStart).lerp(toController,t);d.mesh.position.y+=Math.sin(t*Math.PI)*.13;d.mesh.quaternion.setFromUnitVectors(upVector,direction);}
+    const interference=Math.max(sim.config.interference,sim.config.traffic)/100;
+    for(const d of noiseDashes){d.mesh.visible=show&&d.j<Math.ceil(interference*noiseDashes.length);if(!d.mesh.visible)continue;const phase=(motion*.6+d.j*.137)%1;d.mesh.position.set(-.9+((d.j*37)%180)/100, .6+((d.j*13)%80)/100, -1.25+phase*2.5);d.mesh.rotation.set(.65,d.j*.9,1.0+d.j*.2);}
+
     controls.update();renderer.render(scene,camera);
   }
   renderer.domElement.style.cursor='grab';return {render,markers};

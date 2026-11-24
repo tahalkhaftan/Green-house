@@ -12,9 +12,13 @@ function freshStats(){return {generated:0,delivered:0,retries:0,packetLoss:0,att
 /** Exploratory greenhouse energy/water balance; not a calibrated crop model. */
 export class Simulation {
  constructor(weather,config={}) {
-  if(!weather || !Array.isArray(weather.rows) || weather.rows.length!==8760 || weather.rows.some(row=>!Array.isArray(row)||row.length<5||row.some(x=>!Number.isFinite(x)))) throw new Error('برای این آزمایش به دادهٔ کامل و معتبر ۸۷۶۰ ساعته نیاز است.');
-  this.weather=weather;
-  this.config={mode:'wireless',interference:25,traffic:15,sampleMinutes:5,wiredBreak:false,automatic:true,autoRefill:true,scenario:'normal',...config};
+  const startYear=Number(weather?.start_year??weather?.year),endYear=Number(weather?.end_year??weather?.year);
+  const expectedHours=(Date.UTC(endYear+1,0,1)-Date.UTC(startYear,0,1))/3600000;
+  if(!weather || !Number.isInteger(startYear) || !Number.isInteger(endYear) || endYear<startYear || !Array.isArray(weather.rows) || weather.rows.length!==expectedHours || weather.rows.some(row=>!Array.isArray(row)||row.length<5||row.some(x=>!Number.isFinite(x)))) throw new Error('دادهٔ ساعتی هواشناسی ناقص یا نامعتبر است.');
+  this.weather=weather;this.startYear=startYear;this.availableYears=endYear-startYear+1;
+  this.config={mode:'wireless',interference:25,traffic:15,sampleMinutes:5,wiredBreak:false,wirelessBreak:false,showWaves:false,years:1,automatic:true,autoRefill:true,scenario:'normal',...config};
+  this.config.years=clamp(Math.trunc(this.config.years)||1,1,Math.min(5,this.availableYears));
+  this.totalMinutes=(Date.UTC(startYear+this.config.years,0,1)-Date.UTC(startYear,0,1))/60000;
   this.rng={wired:randomSource(1208),wireless:randomSource(1349)};
   this.positions=DEFAULT_POSITIONS.map(p=>[...p]);this.minutes=0;this.nextSample=0;
   this.env={temp:20,humidity:65,soil:35,co2:420,light:0,vpd:0,water:30,rootPH:6.2,nutrientEC:2.2,waterAdded:0,outsideTemp:weather.rows[0][0],outsideHumidity:weather.rows[0][1],outsideRadiation:weather.rows[0][2],wind:weather.rows[0][3],rain:weather.rows[0][4],dailyLight:0,heaterKwh:0,waterUsed:0};
@@ -24,11 +28,14 @@ export class Simulation {
   this.stats={wired:freshStats(),wireless:freshStats()};this.records=[];this.history=[];this.recent=[];this.hourly=[];
   this.finished=false;this.finishReason=null;this.deathCause='';this.dailyLightAccumulator=0;this.takeSample();
  }
- baseline(){return this.weather.rows[Math.min(8759,Math.floor(this.minutes/60))];}
+ baseline(){return this.weather.rows[Math.min(this.weather.rows.length-1,Math.floor(this.minutes/60))];}
+ setYears(value){const years=clamp(Math.trunc(Number(value))||1,1,Math.min(5,this.availableYears));this.config.years=years;this.totalMinutes=(Date.UTC(this.startYear+years,0,1)-Date.UTC(this.startYear,0,1))/60000;if(this.finishReason==='completed'&&this.minutes<this.totalMinutes){this.finished=false;this.finishReason=null;}else if(!this.finished&&this.minutes>=this.totalMinutes){this.finished=true;this.finishReason='completed';}}
+ isLinkCut(mode=this.config.mode){return mode==='wired'?this.config.wiredBreak:this.config.wirelessBreak;}
+ setLinkCut(mode,cut){if(mode!=='wired'&&mode!=='wireless')return;this.config[mode==='wired'?'wiredBreak':'wirelessBreak']=Boolean(cut);if(cut){this.stats[mode].lastTime.fill(null);if(mode===this.config.mode)this.history=[];}}
  getGood(){const e=this.env;return e.temp>=18&&e.temp<=30&&e.humidity>=50&&e.humidity<=80&&e.soil>=25&&e.soil<=55&&e.rootPH>=5.5&&e.rootPH<=6.5&&e.nutrientEC>=2&&e.nutrientEC<=2.5;}
  reportCondition(){const e=this.env;if(e.temp<18||e.temp>30)return 'دمای نامناسب';if(e.humidity<50||e.humidity>80)return 'رطوبت هوای نامناسب';if(e.soil<25||e.soil>55)return 'رطوبت بستر نامناسب';if(e.rootPH<5.5||e.rootPH>6.5)return 'pH محلول نامناسب';if(e.nutrientEC<2||e.nutrientEC>2.5)return 'غلظت محلول نامناسب';return 'شرایط برای رشد مناسب است';}
  setMode(mode){if(mode==='wired'||mode==='wireless')this.config.mode=mode;}
- isFresh(i){const s=this.stats[this.config.mode];return s.lastTime[i]!==null&&this.minutes-s.lastTime[i]<=this.config.sampleMinutes*3;}
+ isFresh(i){const s=this.stats[this.config.mode];return !this.isLinkCut()&&s.lastTime[i]!==null&&this.minutes-s.lastTime[i]<=this.config.sampleMinutes*3;}
  step(minutes=5){const loops=Math.max(0,Math.floor(minutes/5));for(let k=0;k<loops&&!this.finished;k++)this.advanceFiveMinutes();}
  advanceFiveMinutes(){
   if(this.finished)return;
@@ -89,7 +96,7 @@ export class Simulation {
   this.minutes+=5;
   if(this.minutes%(24*60)===0)this.dailyLightAccumulator=0;
   if(this.plants.some(p=>p.stress>=1)){this.finished=true;this.finishReason='death';this.deathCause=this.reportCondition();}
-  else if(this.minutes>=YEAR_MINUTES){this.finished=true;this.finishReason='completed';}
+  else if(this.minutes>=this.totalMinutes){this.finished=true;this.finishReason='completed';}
   if(!this.finished&&this.minutes>=this.nextSample)this.takeSample();
   if(this.minutes%60===0)this.captureHour();
  }
@@ -98,7 +105,7 @@ export class Simulation {
   for(let i=0;i<5;i++)for(const mode of ['wired','wireless']){
    const s=this.stats[mode];s.generated++;
    const d=Math.hypot(...this.positions[i]);
-   const p=mode==='wired'?(this.config.wiredBreak?1:.001):((this.config.traffic>=100||this.config.interference>=100)?1:clamp(.005+.58*(this.config.interference/100)**2+.30*(this.config.traffic/100)**2+.025*d,0,.98));
+   const p=mode==='wired'?(this.config.wiredBreak?1:.001):((this.config.wirelessBreak||this.config.traffic>=100||this.config.interference>=100)?1:clamp(.005+.58*(this.config.interference/100)**2+.30*(this.config.traffic/100)**2+.025*d,0,.98));
    let success=false,tries=0;
    for(let a=0;a<3;a++){tries++;s.attempts++;if(this.rng[mode]()>=p){success=true;break;}s.packetLoss++;if(a<2)s.retries++;}
    const latency=success?Math.round((mode==='wired'?8:25+.35*this.config.traffic)+(tries-1)*(mode==='wired'?15:30)):null;
@@ -116,6 +123,6 @@ export class Simulation {
   this.hourly.push([this.minutes,+e.outsideTemp.toFixed(2),+e.temp.toFixed(2),+e.humidity.toFixed(2),+e.soil.toFixed(2),+e.light.toFixed(2),+e.co2.toFixed(2),+e.water.toFixed(2),+e.vpd.toFixed(3),+this.plants[0].growth.toFixed(4),+this.plants[0].stress.toFixed(4),+a.heat,+a.fan,+a.pump,+a.cool,...s.last.map(v=>v===null?null:+v.toFixed(2)),...s.lastTime.map(v=>v===null?null:this.minutes-v)]);
  }
  summary(mode=this.config.mode){const s=this.stats[mode];return {...s,ratio:s.generated?100*s.delivered/s.generated:0,age:s.lastTime.map(t=>t===null?null:this.minutes-t)};}
- exportResult(){return {schema:2,created_at:new Date().toISOString(),weather:{source:this.weather.source,city:this.weather.city,year:this.weather.year,type:this.weather.type},scenario:{...this.config},sensor_positions:this.positions,simulated_minutes:this.minutes,finish_reason:this.finishReason,env:{...this.env},plants:this.plants,actuators:{...this.actuators},statistics:this.stats,hourly:{columns:['minute','outside_temp_c','inside_temp_c','relative_humidity_pct','substrate_water_pct','ppfd','co2_ppm','reservoir_l','vpd_kpa','growth_index','stress_index','heater_on','fan_on','pump_on','cooler_on','received_temp','received_humidity','received_soil','received_light','received_co2','temp_age_min','humidity_age_min','soil_age_min','light_age_min','co2_age_min'],rows:this.hourly},records:this.records,note:'Weather is historical reanalysis; internal climate, crop survival, packet losses, and rates are uncalibrated exploratory estimates, not measured data.'};}
+ exportResult(){return {schema:2,created_at:new Date().toISOString(),weather:{source:this.weather.source,city:this.weather.city,start_year:this.startYear,end_year:this.startYear+this.config.years-1,type:this.weather.type},scenario:{...this.config},sensor_positions:this.positions,simulated_minutes:this.minutes,finish_reason:this.finishReason,env:{...this.env},plants:this.plants,actuators:{...this.actuators},statistics:this.stats,hourly:{columns:['minute','outside_temp_c','inside_temp_c','relative_humidity_pct','substrate_water_pct','ppfd','co2_ppm','reservoir_l','vpd_kpa','growth_index','stress_index','heater_on','fan_on','pump_on','cooler_on','received_temp','received_humidity','received_soil','received_light','received_co2','temp_age_min','humidity_age_min','soil_age_min','light_age_min','co2_age_min'],rows:this.hourly},records:this.records,note:'Weather is historical reanalysis; internal climate, crop survival, packet losses, and rates are uncalibrated exploratory estimates, not measured data.'};}
 }
 export function forecast(model,history){if(!model||history.length<4)return null;let values=history.slice(-4).flat().map((x,i)=>(x-model.mean[i])/model.std[i]);for(const layer of model.layers)values=layer.weights.map((row,i)=>{let sum=layer.bias[i];for(let j=0;j<row.length;j++)sum+=row[j]*values[j];return layer.activation==='relu'?Math.max(0,sum):sum;});return history.at(-1)[0]+values[0];}
