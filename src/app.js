@@ -30,7 +30,7 @@ function drawChart(){
 function update(){
  const report=sim.summary();$('sim-date').textContent=dateLabel(sim.minutes);$('run-indicator').textContent=sim.finished?(sim.finishReason==='death'?'● پایان آزمایش':'● یک سال کامل شد'):(running?'● در حال اجرا':'● متوقف');
  const env=sim.env; $('season').textContent=season(sim.minutes);$('day-count').textContent=fa(Math.min(365,Math.floor(sim.minutes/1440)+1))+' از ۳۶۵';
- $('outside-temp').textContent=fa(env.outsideTemp,1)+' °C';$('outside-humidity').textContent=fa(env.outsideHumidity)+'٪';$('vpd').textContent=fa(env.vpd,2)+' kPa';$('dli').textContent=fa(env.dailyLight,1)+' mol/m²';$('water').textContent=fa(env.water,1)+' لیتر';$('water-used').textContent=fa(env.waterUsed,1)+' لیتر';$('heater-energy').textContent=fa(env.heaterKwh,1)+' kWh';$('rain').textContent=fa(env.rain,1)+' mm';$('nutrient-ph').textContent=fa(env.rootPH,1);$('nutrient-ec').textContent=fa(env.nutrientEC,1)+' mS/cm';
+ $('outside-temp').textContent=fa(env.outsideTemp,1)+' °C';$('outside-radiation').textContent=fa(env.outsideRadiation)+' W/m²';$('wind').textContent=fa(env.wind,1)+' km/h';$('outside-humidity').textContent=fa(env.outsideHumidity)+'٪';$('vpd').textContent=fa(env.vpd,2)+' kPa';$('dli').textContent=fa(env.dailyLight,1)+' mol/m²';$('water').textContent=fa(env.water,1)+' لیتر';$('water-used').textContent=fa(env.waterUsed,1)+' لیتر';$('water-added').textContent=fa(env.waterAdded,1)+' لیتر';$('heater-energy').textContent=fa(env.heaterKwh,1)+' kWh';$('rain').textContent=fa(env.rain,1)+' mm';$('nutrient-ph').textContent=fa(env.rootPH,1);$('nutrient-ec').textContent=fa(env.nutrientEC,1)+' mS/cm';
  $('scene-temp').textContent=fa(env.temp,1)+' °C';$('scene-humidity').textContent=fa(env.humidity)+'٪ هوا';$('scene-soil').textContent=fa(env.soil)+'٪ بستر';$('scene-light').textContent=fa(env.light)+' نور';$('scene-water').textContent=fa(env.water,1)+' لیتر';
  for(let i=0;i<5;i++){
   const received=report.last[i], age=report.age[i], stale=age===null||age>sim.config.sampleMinutes*3;
@@ -49,7 +49,7 @@ function update(){
   $(mode+'-detail').textContent=`${fa(v.delivered)} از ${fa(v.generated)} · تأخیر میانگین ${fa(v.delivered ? v.totalLatencyMs/v.delivered : 0)} ms`;
  }
  const selected=report.age.some(a=>a===null||a>sim.config.sampleMinutes*3);
- $('scene-status').innerHTML=`<i style="background:${selected?'#d08a56':'#70af7d'}"></i><span>${selected?'دادهٔ یک سنسور قدیمی است':'آخرین داده‌ها معتبر هستند'}</span>`;
+ $('scene-status').innerHTML=`<i style="background:${selected?'#d08a56':'#70af7d'}"></i><span>${!sim.isFresh(0)&&sim.config.automatic?'دادهٔ دما قطع؛ وضعیت بخاری حفظ شد':selected?'دادهٔ یک سنسور قدیمی است':'آخرین داده‌ها معتبر هستند'}</span>`;
  document.querySelectorAll('[data-act]').forEach(b=>{const on=sim.actuators[b.dataset.act];b.classList.toggle('on',on);b.querySelector('small').textContent=on?'روشن':'خاموش';b.disabled=sim.config.automatic;});
  const overlay=$('finish-overlay');overlay.hidden=!sim.finished;
  if(sim.finished){$('finish-title').textContent=sim.finishReason==='death'?'گیاه کشته شده!!':'یک سال شبیه‌سازی کامل شد';$('finish-detail').textContent=sim.finishReason==='death'?`آزمایش متوقف شد · ${sim.deathCause} · روز ${fa(Math.floor(sim.minutes/1440)+1)}`:'داده‌های یک سال آب‌وهوا بررسی شدند.';}
